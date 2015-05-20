@@ -6,9 +6,10 @@
 #include <errno.h>
 #include <string.h>
 
+#define MAX_BUFFER 2048
 #define MAX_ROUTE_INFO 10
 #define MAX_ARP_SIZE 10
-#define DEBUG
+//#define DEBUG
 
 //the information of the static_routing_table
 struct route_item{
@@ -54,7 +55,7 @@ void read_route_table(){
 		fscanf(file, "%d", &ifnum);
 		route_info[route_item_index].interface = ifnum;
 		route_item_index++;
-		//Route Next line
+		//Read the next line
 		fscanf(file, "%s", buffer); 
 	}
 	fclose(file);
@@ -92,11 +93,56 @@ void read_arp_table(){
 	}
 }
 
+int find_arp_by_mac(char* mac_addr){
+	int i=0;
+	for(i=0; i<arp_item_index; i++){
+		if(strcmp(mac_addr, arp_table[i].mac_addr) == 0){
+			return i;
+		}
+	}
+	return -1;
+}
+
+int find_arp_by_ip(char* ip_addr){
+	int i=0;
+	for(i=0; i<arp_item_index; i++){
+		if(strcmp(mac_addr, arp_table[i].ip_addr) == 0){
+			return i;
+		}
+	}
+	return -1;
+}
+
 int main(){
+	//Init tables and variables.
+	int i;
+	int sock_fd;
+	int n_read = 0;
+	int route_index = -1;
+	int arp_index = -1;
+	char buffer[MAX_BUFFER];
+	char type[4];
+	char src_ip[16];
+	char des_ip[16];
+	char src_mac[18];
+	char des_mac[18];
+	char* p;
+	char* ip_head;
+	char* eth_head;
+	unsigned count=0;
+	memset(src_ip, 0, 16);
+	memset(des_ip, 0, 16);
+	memset(src_mac, 0, 18);
+	memset(des_mac, 0, 18);
 	read_route_table();
 	read_arp_table();
+	sock_fd = socket(PF_PACKET, SOCK_RAW, hton(ETH_P_IP));
+	if(sock_fd < 0){
+		perror("Creating raw socket");
+		exit(0);
+	}
 #ifdef DEBUG
-	int i;
+	printf("\n============= Debug Information =============\n");
 	printf("Static route table\n");
 	for(i=0; i<route_item_index; i++){
 		printf("%s %s %s %d\n", 
@@ -106,13 +152,49 @@ int main(){
 			route_info[i].interface
 		);
 	}
-	printf("ARP table\n");
+	printf("\nARP table\n");
 	for(i=0; i<arp_item_index; i++){
 		printf("%s %s\n",
 			arp_table[i].ip_addr,
 			arp_table[i].mac_addr
 		);
 	}
+	printf("===============================================\n\n");
 #endif
-	return 0;
+	//Start working
+	while(1){
+		//Get a message from the raw socket.
+		n_read = recvfrom(sock_fd, buffer, MAX_BUFFER, 0, NULL, NULL);
+		if(n_read < 64){
+			if(n_read < 0){
+				perror("Receiving message");
+			} else {
+				printf("Receiving message: Too short.\n");
+			}
+			continue;
+		}
+		//Read the eth head.
+		count++;
+		eth_head = buffer;
+		p = eth_head;
+		sprintf(des_mac, "%02x:%02x:%02x:%02x:%02x:%02x",
+			p[0]&0xff, p[1]&0xff,
+			p[2]&0xff, p[3]&0xff,
+			p[4]&0xff, p[5]&0xff
+		);
+		p += 6;
+		sprintf(src_mac, "%02x:%02x:%02x:%02x:%02x:%02x",
+			p[0]&0xff, p[1]&0xff,
+			p[2]&0xff, p[3]&0xff,
+			p[4]&0xff, p[5]&0xff
+		);
+		p += 6;
+		sprintf(type, "%02x%02x", p[0]&0xff, p[1]&0xff);
+		if(strncmp(type, "0800", 4) != 0){
+			printf("Unrecognized datagram: 0x%s\n", type);
+			continue;
+		}
+		//Read the IP head.
+	}
+	return count;
 }

@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <linux/if_ether.h>
 #include <errno.h>
 #include <string.h>
 
@@ -106,7 +107,7 @@ int find_arp_by_mac(char* mac_addr){
 int find_arp_by_ip(char* ip_addr){
 	int i=0;
 	for(i=0; i<arp_item_index; i++){
-		if(strcmp(mac_addr, arp_table[i].ip_addr) == 0){
+		if(strcmp(ip_addr, arp_table[i].ip_addr) == 0){
 			return i;
 		}
 	}
@@ -136,7 +137,7 @@ int main(){
 	memset(des_mac, 0, 18);
 	read_route_table();
 	read_arp_table();
-	sock_fd = socket(PF_PACKET, SOCK_RAW, hton(ETH_P_IP));
+	sock_fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_IP));
 	if(sock_fd < 0){
 		perror("Creating raw socket");
 		exit(0);

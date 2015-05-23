@@ -122,8 +122,8 @@ char* find_route_gateway(char* ip_addr){
 	memset(gateway, 0, 16);
 	int i;
 	for(i=0; i<route_item_index; i++){
-		//Just ignore the input netmask and set it 24 ^_^.
-		if(strncmp(ip_addr, route_info[i].destination, 12) == 0){
+		//Just ignore the input netmask and compare the first 9 char ^_^.
+		if(strncmp(ip_addr, route_info[i].destination, 9) == 0){
 			strcpy(gateway, route_info[i].gateway);
 			return gateway;
 		}
@@ -329,12 +329,7 @@ int main(){
 		for(i=0; i<6; i++){
 			eth_head[6+i] = write[i];
 		}
-		/*
-		if(sendto(sock_fd, buffer, n_read, 0, NULL, 0) < 0){
-			perror("Sending: ");
-		}
-		*/
-		//Just a backup.
+		//Just the final step
 		struct ifreq ifrq;
 		struct sockaddr_ll addr;
 		strcpy(ifrq.ifr_name, device);

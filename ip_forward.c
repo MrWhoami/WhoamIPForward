@@ -3,7 +3,10 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <net/if.h>
+#include <netpacket/packet.h>
 #include <linux/if_ether.h>
+#include <linux/sockios.h>
 #include <errno.h>
 #include <string.h>
 
@@ -168,6 +171,7 @@ int main(){
 	char gateway[16];
 	char src_mac[18];
 	char des_mac[18];
+	char device[10];
 	char write[6];
 	char* p;
 	char* ip_head;
@@ -178,6 +182,7 @@ int main(){
 	memset(gateway, 0, 16);
 	memset(src_mac, 0, 18);
 	memset(des_mac, 0, 18);
+	memset(device, 0, 10);
 	read_route_table();
 	read_arp_table();
 	sock_fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_IP));
@@ -300,9 +305,11 @@ int main(){
 		switch(src_arp_index){
 		case 0:
 			strcpy(src_mac, arp_table[0].mac_addr);
+			sprintf(device, "eth%d", 0);
 			break;
 		case 1:
 			strcpy(src_mac, arp_table[1].mac_addr);
+			sprintf(device, "eth%d", 1);
 			break;
 		default:
 			printf("Unknown gateway.\n");
@@ -322,7 +329,19 @@ int main(){
 		for(i=0; i<6; i++){
 			eth_head[6+i] = write[i];
 		}
+		/*
 		if(sendto(sock_fd, buffer, n_read, 0, NULL, 0) < 0){
+			perror("Sending: ");
+		}
+		*/
+		//Just a backup.
+		struct ifreq ifrq;
+		struct sockaddr_ll addr;
+		strcpy(ifrq.ifr_name, device);
+		ioctl(sock_fd, SIOCGIFINDEX, &ifrq);
+		addr.sll_ifindex = ifrq.ifr_ifindex;
+		addr.sll_family = PF_PACKET;
+		if(sendto(sock_fd, buffer, n_read, 0, (struct sockaddr*)&addr, sizeof(addr)) < 0){
 			perror("Sending: ");
 		}
 #ifdef DEBUG

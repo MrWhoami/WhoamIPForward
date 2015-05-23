@@ -119,11 +119,34 @@ int find_arp_by_ip(char* ip_addr){
 
 char* find_route_gateway(char* ip_addr){
 	static char gateway[16];
+	char chk_ip[4];
+	char chk_ds[4];
+	char chk_nm[4];
+	int i, j;
+	bool check;
 	memset(gateway, 0, 16);
-	int i;
+	sscanf(ip_addr, "%d.%d.%d.%d", 
+		&chk_ip[0], &chk_ip[1],
+		&chk_ip[2], &chk_ip[3]
+	);
 	for(i=0; i<route_item_index; i++){
 		//Just ignore the input netmask and compare the first 9 char ^_^.
-		if(strncmp(ip_addr, route_info[i].destination, 9) == 0){
+		sscanf(route_info[i].destination, "%d.%d.%d.%d", 
+			&chk_ds[0], &chk_ds[1],
+			&chk_ds[2], &chk_ds[3]
+		);
+		sscanf(route_info[i].gateway, "%d.%d.%d.%d", 
+			&chk_nm[0], &chk_nm[1],
+			&chk_nm[2], &chk_nm[3]
+		);
+		check = 1;
+		for(j=0; j<4; j++){
+			if((chk_ip[j]&chk_nm[j])==(chk_ds[j]&chk_nm[j])){
+				check = 0;
+				break;
+			}
+		}
+		if(check){
 			strcpy(gateway, route_info[i].gateway);
 			return gateway;
 		}

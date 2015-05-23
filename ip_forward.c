@@ -121,7 +121,7 @@ char* find_route_gateway(char* ip_addr){
 	for(i=0; i<route_item_index; i++){
 		//Just ignore the input netmask and set it 24 ^_^.
 		if(strncmp(ip_addr, route_info[i].destination, 12) == 0){
-			strncpy(gateway, route_info[i].gateway, 15);
+			strcpy(gateway, route_info[i].gateway);
 			return gateway;
 		}
 	}
@@ -165,15 +165,17 @@ int main(){
 	char type[4];
 	char src_ip[16];
 	char des_ip[16];
+	char gateway[16];
 	char src_mac[18];
 	char des_mac[18];
+	char write[6];
 	char* p;
 	char* ip_head;
 	char* eth_head;
-	char* gateway;
 	unsigned count=0;
 	memset(src_ip, 0, 16);
 	memset(des_ip, 0, 16);
+	memset(gateway, 0, 16);
 	memset(src_mac, 0, 18);
 	memset(des_mac, 0, 18);
 	read_route_table();
@@ -266,10 +268,10 @@ int main(){
 		refresh_arp(src_ip, src_mac);
 		src_arp_index = find_arp_by_ip(src_ip);
 		des_arp_index = find_arp_by_ip(des_ip);
-		if( src_arp_index == 1 ||
-			src_arp_index == 2 ||
-			des_arp_index == 1 ||
-			des_arp_index == 2 ){
+		if( src_arp_index == 0 ||
+			src_arp_index == 1 ||
+			des_arp_index == 0 ||
+			des_arp_index == 1 ){
 			//This is a local packet.
 			continue;
 		}
@@ -277,9 +279,9 @@ int main(){
 		printf("This is not local.\n");
 		printf("Start checking the static ip table.\n");
 #endif
-		gateway = find_route_gateway(des_ip);
+		strcpy(gateway, find_route_gateway(des_ip));
 		des_arp_index = find_arp_by_ip(gateway);
-		if(des_arp_index == 1 || des_arp_index == 2){
+		if(des_arp_index == 0 || des_arp_index == 1){
 			des_arp_index = find_arp_by_ip(des_ip);
 		}
 		if(des_arp_index == -1){
@@ -292,6 +294,39 @@ int main(){
 		printf("Gateway: %s\n", gateway);
 		printf("MAC:     %s\n", des_mac);
 		printf("Start sending.\n");
+#endif
+		strcpy(gateway, find_route_gateway(gateway));
+		src_arp_index = find_arp_by_ip(gateway);
+		switch(src_arp_index){
+		case 0:
+			strcpy(src_mac, arp_table[0].mac_addr);
+			break;
+		case 1:
+			strcpy(src_mac, arp_table[1].mac_addr);
+			break;
+		default:
+			printf("Unknown gateway.\n");
+			exit(0);
+		}
+		sscanf(des_mac, "%02x:%02x:%02x:%02x:%02x:%02x",
+			&write[0], &write[1], &write[2],
+			&write[3], &write[4], &write[5]
+		);
+		for(i=0; i<6; i++){
+			eth_head[i] = write[i];
+		}
+		sscanf(src_mac, "%02x:%02x:%02x:%02x:%02x:%02x",
+			&write[0], &write[1], &write[2],
+			&write[3], &write[4], &write[5]
+		);
+		for(i=0; i<6; i++){
+			eth_head[6+i] = write[i];
+		}
+		if(sendto(sock_fd, buffer, n_read, 0, NULL, 0) < 0){
+			perror("Sending: ");
+		}
+#ifdef DEBUG
+		printf("Packet %d send successfully.\n\n", count);
 #endif
 	}
 	return count;
